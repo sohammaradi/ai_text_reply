@@ -61,7 +61,7 @@ def improve():
     """Main endpoint for iPhone shortcut"""
     try:
         data = request.get_json()
-        text = data.get('text', 'Hello').strip()
+        text = data.get('text', 'Hel hfdhdjhfdj dlo').strip()
         
         if not text:
             return jsonify({'error': 'No text provided'}), 400
