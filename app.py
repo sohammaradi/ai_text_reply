@@ -37,11 +37,15 @@ def get_smart_suggestions(user_text):
     prompt = f"""TEXT: "{user_text}"
 
 Return a JSON with these EXACT keys:
-1. "display_text": Formatted string with reply options
+1. "display_text": Formatted string with ALL suggestions
 2. "first_reply": First reply option (for auto-copy)
 3. "all_replies": Array of all reply options
 
 FORMAT the "display_text" like this example:
+📤 Original: helo cant meet today
+
+✅ Corrected: Hello, can't meet today
+
 💬 Reply Options:
 • No worries! Maybe tomorrow? 😊
 • Got it, thanks for letting me know!
@@ -51,12 +55,7 @@ FORMAT the "display_text" like this example:
 • Hi, unavailable today
 • Hey, busy today
 
-Rules:
-- Return 3 reply options
-- Return 2 similar phrases
-- Keep language SIMPLE and NATURAL
-- Include 1 emoji if appropriate
-- All in clean bullet format"""
+Keep it CLEAN and SIMPLE."""
 
     try:
         response = openai.ChatCompletion.create(
@@ -82,6 +81,34 @@ Rules:
     except Exception as e:
         print(f"API Error: {e}")
         return get_fallback_display(user_text)
+
+def get_fallback_display(text):
+    """Simple fallback with everything formatted"""
+    # Basic correction
+    corrected = text
+    fixes = [(" helo ", " hello "), (" cant ", " can't "), (" im ", " I'm ")]
+    for wrong, right in fixes:
+        corrected = corrected.replace(wrong, right)
+    
+    if corrected and len(corrected) > 0:
+        corrected = corrected[0].upper() + corrected[1:]
+    
+    return {
+        "display_text": f"""📤 Original: {text}
+
+✅ Corrected: {corrected}
+
+💬 Reply Options:
+• Thanks! 😊
+• Got it, thanks!
+• Okay, noted!
+
+🔄 Similar Phrases:
+• {corrected}
+• {corrected}!""",
+        "first_reply": "Thanks! 😊",
+        "all_replies": ["Thanks! 😊", "Got it, thanks!", "Okay, noted!"]
+    }
 
 def get_fallback_display(text):
     """Simple fallback with everything formatted"""
