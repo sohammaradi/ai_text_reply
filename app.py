@@ -42,16 +42,12 @@ Return a JSON with these EXACT keys:
 3. "all_replies": Array of all reply options
 
 FORMAT the "display_text" like this example:
-📤 Original: helo cant meet today
-
-✅ Corrected: Hello, can't meet today
-
-💬 Reply Options:
+Reply Options:
 • No worries! Maybe tomorrow? 😊
 • Got it, thanks for letting me know!
 • Okay, another time then!
 
-🔄 Similar Phrases:
+Similar Phrases:
 • Hi, unavailable today
 • Hey, busy today
 
