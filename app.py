@@ -37,21 +37,26 @@ def get_smart_suggestions(user_text):
     prompt = f"""TEXT: "{user_text}"
 
 Return a JSON with these EXACT keys:
-1. "display_text": Formatted string with ALL suggestions
+1. "display_text": Formatted string with reply options
 2. "first_reply": First reply option (for auto-copy)
 3. "all_replies": Array of all reply options
 
 FORMAT the "display_text" like this example:
-Reply Options:
+💬 Reply Options:
 • No worries! Maybe tomorrow? 😊
 • Got it, thanks for letting me know!
 • Okay, another time then!
 
-Similar Phrases:
+🔄 Similar Phrases:
 • Hi, unavailable today
 • Hey, busy today
 
-Keep it CLEAN and SIMPLE."""
+Rules:
+- Return 3 reply options
+- Return 2 similar phrases
+- Keep language SIMPLE and NATURAL
+- Include 1 emoji if appropriate
+- All in clean bullet format"""
 
     try:
         response = openai.ChatCompletion.create(
