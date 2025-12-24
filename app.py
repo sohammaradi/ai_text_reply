@@ -32,86 +32,83 @@ if not openai.api_key:
 # ============================================
 
 def get_smart_suggestions(user_text):
-    """Get suggested replies and corrected text in ONE API call"""
+    """Get ALL suggestions formatted for display"""
     
-    # Smart prompt for ChatGPT
-    prompt = f"""You are an English conversation assistant helping someone learn natural English.
+    prompt = f"""TEXT: "{user_text}"
 
-TEXT: "{user_text}"
+Return a JSON with these EXACT keys:
+1. "display_text": Formatted string with ALL suggestions
+2. "first_reply": First reply option (for auto-copy)
+3. "all_replies": Array of all reply options
 
-Return a JSON object with EXACTLY these 3 keys:
-1. "suggested_replies": 3 casual, friendly reply options (array of strings)
-2. "corrected_text": Grammar-corrected version (string)
-3. "similar_phrases": 2-3 different ways to say the same thing (array of strings)
+FORMAT the "display_text" like this example:
+📤 Original: helo cant meet today
 
-Rules for replies:
-- Keep it NATURAL (like real people talk)
-- Use SIMPLE English (not complex vocabulary)
-- Make it FRIENDLY
-- Include 1 reply with emoji if appropriate 😊
-- All replies should be 1 short sentence
+✅ Corrected: Hello, can't meet today
 
-Example format:
-{{
-  "suggested_replies": ["Thanks!", "Got it!", "Okay!"],
-  "corrected_text": "Hello there",
-  "similar_phrases": ["Hi there", "Hey"]
-}}"""
+💬 Reply Options:
+• No worries! Maybe tomorrow? 😊
+• Got it, thanks for letting me know!
+• Okay, another time then!
+
+🔄 Similar Phrases:
+• Hi, unavailable today
+• Hey, busy today
+
+Keep it CLEAN and SIMPLE."""
 
     try:
-        # OpenAI API call (works with openai==0.28)
         response = openai.ChatCompletion.create(
-            model="gpt-3.5-turbo",  # Use gpt-4 if you have access
+            model="gpt-3.5-turbo",
             messages=[
-                {"role": "system", "content": "You are a helpful assistant. Return ONLY valid JSON, no other text."},
+                {"role": "system", "content": "Return ONLY valid JSON with display_text, first_reply, all_replies keys."},
                 {"role": "user", "content": prompt}
             ],
-            temperature=0.7,  # Balanced creativity
-            max_tokens=350    # Enough for all responses
+            temperature=0.7,
+            max_tokens=400
         )
         
-        # Extract response content
-        content = response['choices'][0]['message']['content'].strip()
+        content = response['choices'][0]['message']['content']
         
-        # Debug logging (prints to Render logs)
-        print(f"📨 Received: {user_text[:50]}...")
-        print(f"🤖 ChatGPT raw response: {content[:100]}...")
-        
-        # Try to extract JSON from response
+        # Extract JSON
+        import re
         json_match = re.search(r'\{.*\}', content, re.DOTALL)
         if json_match:
-            result = json.loads(json_match.group())
+            return json.loads(json_match.group())
+        else:
+            return get_fallback_display(user_text)
             
-            # Validate required keys exist
-            required_keys = ["suggested_replies", "corrected_text", "similar_phrases"]
-            if all(key in result for key in required_keys):
-                return result
-            else:
-                print(f"⚠️ Missing keys in response: {result.keys()}")
-                
-        # If JSON parsing failed, use fallback
-        print("⚠️ JSON parsing failed, using fallback")
-        return get_fallback_response(user_text)
-            
-    except openai.error.AuthenticationError:
-        print("❌ OpenAI Authentication Error: Invalid API key")
-        return {
-            "error": "OpenAI API key is invalid",
-            "suggested_replies": ["Please check API key", "Setup required", "Contact admin"],
-            "corrected_text": user_text,
-            "similar_phrases": [user_text]
-        }
-    except openai.error.RateLimitError:
-        print("❌ OpenAI Rate Limit: Too many requests")
-        return {
-            "error": "Rate limit exceeded",
-            "suggested_replies": ["Try again later", "Server busy", "Please wait"],
-            "corrected_text": user_text,
-            "similar_phrases": [user_text]
-        }
     except Exception as e:
-        print(f"❌ Unexpected error: {e}")
-        return get_fallback_response(user_text)
+        print(f"API Error: {e}")
+        return get_fallback_display(user_text)
+
+def get_fallback_display(text):
+    """Simple fallback with everything formatted"""
+    # Basic correction
+    corrected = text
+    fixes = [(" helo ", " hello "), (" cant ", " can't "), (" im ", " I'm ")]
+    for wrong, right in fixes:
+        corrected = corrected.replace(wrong, right)
+    
+    if corrected and len(corrected) > 0:
+        corrected = corrected[0].upper() + corrected[1:]
+    
+    return {
+        "display_text": f"""📤 Original: {text}
+
+✅ Corrected: {corrected}
+
+💬 Reply Options:
+• Thanks! 😊
+• Got it, thanks!
+• Okay, noted!
+
+🔄 Similar Phrases:
+• {corrected}
+• {corrected}!""",
+        "first_reply": "Thanks! 😊",
+        "all_replies": ["Thanks! 😊", "Got it, thanks!", "Okay, noted!"]
+    }
 
 def get_fallback_response(text):
     """Fallback response when OpenAI fails"""
@@ -156,53 +153,29 @@ def get_fallback_response(text):
 
 @app.route('/suggest', methods=['POST'])
 def suggest():
-    """
-    Main endpoint - returns everything in one response
-    Expected JSON: {"text": "your message here"}
-    """
+    """ONE simple endpoint returning EVERYTHING formatted"""
     try:
-        # Get JSON data
         data = request.get_json()
-        if not data:
-            return jsonify({
-                "error": "No JSON data received",
-                "solution": "Send JSON: {'text': 'your message'}"
-            }), 400
-        
         user_text = data.get('text', '').strip()
         
-        # Validate input
         if not user_text:
-            return jsonify({
-                "error": "Empty text",
-                "example": "Send {'text': 'hello world'}"
-            }), 400
+            return jsonify({"error": "No text provided"}), 400
         
-        if len(user_text) > 500:
-            return jsonify({
-                "error": "Text too long (max 500 characters)",
-                "received_length": len(user_text)
-            }), 400
-        
-        # Get AI suggestions
+        # Get everything in ONE call
         result = get_smart_suggestions(user_text)
         
-        # Add metadata
+        # Add original text
         result['original_text'] = user_text
-        result['success'] = 'error' not in result
-        result['characters_processed'] = len(user_text)
+        result['success'] = True
         
         return jsonify(result)
         
     except Exception as e:
-        print(f"❌ Server error in /suggest: {e}")
         return jsonify({
-            "error": "Internal server error",
-            "message": str(e),
-            "original_text": user_text if 'user_text' in locals() else "unknown",
-            "suggested_replies": ["Server error", "Please try again"],
-            "corrected_text": "Error occurred",
-            "similar_phrases": ["Try again later"]
+            "error": str(e),
+            "display_text": f"❌ Error: {e}",
+            "first_reply": "Error occurred",
+            "all_replies": ["Try again"]
         }), 500
 
 @app.route('/health', methods=['GET'])
